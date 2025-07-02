@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import smtplib
 import feedparser
-import openai
+from openai import OpenAI
 import gspread
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
@@ -12,13 +12,13 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Setup environment
+# Environment variables
 EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 TO_EMAIL = os.environ.get("TO_EMAIL")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID")
-openai.api_key = OPENAI_API_KEY
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # NIFTY 50 tickers
 NIFTY50_TICKERS = [
@@ -33,49 +33,49 @@ NIFTY50_TICKERS = [
     "SHREECEM.NS", "M&M.NS", "APOLLOHOSP.NS", "TATAMOTORS.NS", "ICICIPRULI.NS"
 ]
 
-# 🧠 GPT summary
+# 🧠 GPT Summary
 def generate_gpt_summary(df):
-    prompt = f"""Given the following top NIFTY stock performers today:
-
-{df.to_string(index=False)}
-
-Write a 3-bullet point summary with suggestions or watchlist tips for tomorrow's market."""
-    response = openai.ChatCompletion.create(
+    prompt = f"""Given the following top NIFTY stock performers today:\n\n{df.to_string(index=False)}\n\nWrite a 3-bullet point summary with tomorrow's trading suggestions."""
+    response = openai_client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}]
     )
-    return response.choices[0].message['content']
+    return response.choices[0].message.content
 
-# 📊 Google Sheets logging
+# 📊 Log to Google Sheets
 def log_to_google_sheets(df):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(GOOGLE_SHEET_ID).sheet1
-    now = datetime.now().strftime("%d-%b-%Y")
+    today = datetime.now().strftime("%d-%b-%Y")
 
     for _, row in df.iterrows():
-        sheet.append_row([now, row['Ticker'], row['Change(%)'], row['Volume']])
+        sheet.append_row([today, row['Ticker'], row['Change(%)'], row['Volume']])
 
-# 📈 Chart generation
+# 📈 Chart generation to /tmp/
 def generate_charts(tickers):
     image_paths = []
     for ticker in tickers:
         data = yf.download(ticker, period="5d", interval="1d", progress=False)
+        if data.empty:
+            continue
         plt.figure()
         data['Close'].plot(title=f"{ticker} (5D Close Price)")
-        chart_path = f"{ticker}_chart.png"
+        chart_path = f"/tmp/{ticker}_chart.png"
         plt.savefig(chart_path)
         plt.close()
-        image_paths.append(chart_path)
+        if os.path.exists(chart_path):
+            print(f"✅ Saved chart: {chart_path}")
+            image_paths.append(chart_path)
     return image_paths
 
-# 📰 Market News
+# 📰 Get News
 def get_market_news():
     feed = feedparser.parse("https://news.google.com/rss/search?q=nifty+OR+stock+market&hl=en-IN&gl=IN&ceid=IN:en")
     return [entry['title'] for entry in feed.entries[:5]]
 
-# 📈 Top stock gainers
+# 📈 Top Performers
 def get_top_performers(tickers):
     data = yf.download(tickers, period="1d", interval="1d", group_by='ticker', progress=False)
     results = []
@@ -93,7 +93,7 @@ def get_top_performers(tickers):
     df = pd.DataFrame(results, columns=['Ticker', 'Change(%)', 'Volume'])
     return df.sort_values(by='Change(%)', ascending=False).head(5)
 
-# 📧 Emailing
+# 📧 Send Email
 def send_email(subject, body_html, attachments=[]):
     msg = MIMEMultipart()
     msg['From'] = EMAIL_ADDRESS
@@ -112,7 +112,7 @@ def send_email(subject, body_html, attachments=[]):
         server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
         server.send_message(msg)
 
-# 🧠 Main Execution
+# 🎯 Main Run Function
 def run_bot():
     print("📈 Fetching top stock performers...")
     top_stocks = get_top_performers(NIFTY50_TICKERS)
@@ -140,5 +140,6 @@ def run_bot():
 
     print("✅ Done!")
 
+# Entry
 if __name__ == "__main__":
     run_bot()
