@@ -5,11 +5,11 @@ from datetime import datetime
 import feedparser
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import os
 
-# Email config
-EMAIL_ADDRESS = 'mohansgr3@gmail.com'
-EMAIL_PASSWORD = 'qcxq gmnw sinf omhr'  # <-- Replace this with your Gmail App Password
-TO_EMAIL = 'mohansgr3@gmail.com'
+EMAIL_ADDRESS = os.environ.get('EMAIL_ADDRESS')
+EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
+TO_EMAIL = os.environ.get('TO_EMAIL')
 
 NIFTY50_TICKERS = [
     "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
