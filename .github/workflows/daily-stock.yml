@@ -2,8 +2,8 @@ name: Daily Stock Email Report
 
 on:
   schedule:
-    - cron: "0 12 * * *" # Runs every day at 12:00 UTC (5:30 PM IST)
-  workflow_dispatch: # Allows manual trigger
+    - cron: "0 12 * * *" # Runs every day at 5:30 PM IST
+  workflow_dispatch:
 
 jobs:
   run-stock-bot:
@@ -23,9 +23,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run bot
+      - name: Decode Google credentials
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > credentials.json
+
+      - name: Run stock bot
         env:
           EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_SHEET_ID: 16oEDa3gNkFjMj44GEbjzY5oiBu231POa8d3eEyaNjvA
         run: python3 daily_stock_report.py

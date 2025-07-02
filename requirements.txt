@@ -1,3 +1,7 @@
 yfinance
 pandas
 feedparser
+matplotlib
+gspread
+oauth2client
+openai
